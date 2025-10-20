@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div x-data="analyzer()" class="min-h-screen">
+        <!-- ヘッダー -->
+        <header class="bg-blue-600 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-6">
+                <h1 class="text-3xl font-bold">🌸 楽天市場・Nint商品分析ツール</h1>
+                <p class="text-blue-100 mt-2">型番商品の仕入れ判断を自動化</p>
+            </div>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <main class="container mx-auto px-4 py-8">
+            <!-- 入力フォーム -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h2 class="text-2xl font-bold mb-4">商品分析</h2>
+                <form @submit.prevent="analyzeProduct" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            キーワード / JANコード
+                        </label>
+                        <input
+                            type="text"
+                            x-model="formData.keyword"
+                            placeholder="例: iPhone 15 Pro"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                            required
+                        >
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                仕入価格(円)
+                            </label>
+                            <input
+                                type="number"
+                                x-model.number="formData.purchase_price"
+                                placeholder="例: 50000"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                required
+                            >
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                目標販売価格(円) <span class="text-gray-500 text-xs">※任意</span>
+                            </label>
+                            <input
+                                type="number"
+                                x-model.number="formData.target_selling_price"
+                                placeholder="空欄で自動算出"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                            >
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            取得件数
+                        </label>
+                        <input
+                            type="number"
+                            x-model.number="formData.max_results"
+                            min="5"
+                            max="50"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                        >
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="w-full bg-blue-600 text-white py-3 px-6 rounded-md hover:bg-blue-700 transition duration-200 font-semibold"
+                        :disabled="loading"
+                    >
+                        <span x-show="!loading">🔍 分析開始</span>
+                        <span x-show="loading">⏳ 分析中...</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- エラー表示 -->
+            <div x-show="error" class="bg-red-50 border-l-4 border-red-500 p-4 mb-8">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <span class="text-red-500 text-xl">⚠️</span>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-red-700" x-text="error"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分析結果 -->
+            <div x-show="result" class="space-y-6">
+                <!-- 推奨判定 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-2xl font-bold mb-4">📊 判定結果</h3>
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <span
+                                class="inline-block px-6 py-3 rounded-lg text-white text-2xl font-bold"
+                                :class="{
+                                    'bg-green-500': result?.recommendation?.decision === 'GO',
+                                    'bg-yellow-500': result?.recommendation?.decision === 'Conditional',
+                                    'bg-red-500': result?.recommendation?.decision === 'No-Go'
+                                }"
+                                x-text="result?.recommendation?.decision"
+                            ></span>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm text-gray-600">信頼度</p>
+                            <p class="text-3xl font-bold" x-text="result?.recommendation?.confidence + '%'"></p>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 mb-4" x-text="result?.recommendation?.reasoning"></p>
+
+                    <div class="bg-gray-50 rounded p-4">
+                        <h4 class="font-semibold mb-2">アクションアイテム:</h4>
+                        <ul class="list-disc list-inside space-y-1">
+                            <template x-for="item in result?.recommendation?.action_items" :key="item">
+                                <li class="text-gray-700" x-text="item"></li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 総合スコア -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold mb-4">📈 総合スコア</h3>
+                    <div class="text-center mb-6">
+                        <div class="text-5xl font-bold text-blue-600" x-text="result?.comprehensive_score?.total_score"></div>
+                        <div class="text-gray-600">/ 100点</div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div class="text-center p-4 bg-gray-50 rounded">
+                            <div class="text-sm text-gray-600">価格競争力</div>
+                            <div class="text-2xl font-bold" x-text="result?.comprehensive_score?.price_competitiveness"></div>
+                        </div>
+                        <div class="text-center p-4 bg-gray-50 rounded">
+                            <div class="text-sm text-gray-600">市場機会</div>
+                            <div class="text-2xl font-bold" x-text="result?.comprehensive_score?.market_opportunity"></div>
+                        </div>
+                        <div class="text-center p-4 bg-gray-50 rounded">
+                            <div class="text-sm text-gray-600">競争度</div>
+                            <div class="text-2xl font-bold" x-text="result?.comprehensive_score?.competition_level"></div>
+                        </div>
+                        <div class="text-center p-4 bg-gray-50 rounded">
+                            <div class="text-sm text-gray-600">サムネイル品質</div>
+                            <div class="text-2xl font-bold" x-text="result?.comprehensive_score?.thumbnail_quality"></div>
+                        </div>
+                        <div class="text-center p-4 bg-gray-50 rounded">
+                            <div class="text-sm text-gray-600">利益性</div>
+                            <div class="text-2xl font-bold" x-text="result?.comprehensive_score?.profitability"></div>
+                        </div>
+                        <div class="text-center p-4 bg-gray-50 rounded">
+                            <div class="text-sm text-gray-600">リスク</div>
+                            <div class="text-2xl font-bold" x-text="result?.comprehensive_score?.risk_level"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 利益分析 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold mb-4">💰 利益分析</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <div class="text-sm text-gray-600">粗利率</div>
+                            <div class="text-2xl font-bold text-green-600" x-text="result?.profit_analysis?.gross_margin?.toFixed(1) + '%'"></div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">粗利額</div>
+                            <div class="text-2xl font-bold" x-text="'¥' + result?.profit_analysis?.gross_profit?.toLocaleString()"></div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">推定月間利益</div>
+                            <div class="text-2xl font-bold text-blue-600" x-text="'¥' + result?.profit_analysis?.estimated_monthly_profit?.toLocaleString()"></div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">損益分岐点</div>
+                            <div class="text-2xl font-bold" x-text="result?.profit_analysis?.break_even_quantity + '個/月'"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 楽天商品一覧 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold mb-4">🛍️ 楽天市場 上位商品</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">順位</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">商品名</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">店舗</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">価格</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ポイント</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <template x-for="product in result?.rakuten_products?.slice(0, 10)" :key="product.rank">
+                                    <tr>
+                                        <td class="px-4 py-3 whitespace-nowrap" x-text="product.rank"></td>
+                                        <td class="px-4 py-3 text-sm text-gray-900" x-text="product.product_name.substring(0, 50) + '...'"></td>
+                                        <td class="px-4 py-3 text-sm text-gray-600" x-text="product.shop_name"></td>
+                                        <td class="px-4 py-3 whitespace-nowrap font-semibold" x-text="'¥' + product.total_price.toLocaleString()"></td>
+                                        <td class="px-4 py-3 whitespace-nowrap" x-text="product.point_rate + '倍'"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function analyzer() {
+            return {
+                formData: {
+                    keyword: '',
+                    purchase_price: null,
+                    target_selling_price: null,
+                    max_results: 20
+                },
+                result: null,
+                loading: false,
+                error: null,
+
+                async analyzeProduct() {
+                    this.loading = true;
+                    this.error = null;
+                    this.result = null;
+
+                    try {
+                        const response = await fetch('/api/analyze', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(this.formData)
+                        });
+
+                        if (!response.ok) {
+                            const error = await response.json();
+                            throw new Error(error.detail || '分析エラーが発生しました');
+                        }
+
+                        this.result = await response.json();
+                    } catch (err) {
+                        this.error = err.message;
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
