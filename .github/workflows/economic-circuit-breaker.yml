@@ -31,10 +31,15 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install yq for YAML parsing
+      - name: Install dependencies
         run: |
+          # Install yq for YAML parsing
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
+
+          # Install bc for calculations
+          sudo apt-get update
+          sudo apt-get install -y bc
 
       - name: Load BUDGET.yml configuration
         id: budget
@@ -47,10 +52,16 @@ jobs:
           echo "warning_threshold=$WARNING_THRESHOLD" >> $GITHUB_OUTPUT
           echo "emergency_threshold=$EMERGENCY_THRESHOLD" >> $GITHUB_OUTPUT
 
+          # Calculate threshold amounts
+          WARNING_AMOUNT=$(echo "$BUDGET * $WARNING_THRESHOLD" | bc)
+          EMERGENCY_AMOUNT=$(echo "$BUDGET * $EMERGENCY_THRESHOLD" | bc)
+          WARNING_PERCENT=$(echo "$WARNING_THRESHOLD * 100" | bc)
+          EMERGENCY_PERCENT=$(echo "$EMERGENCY_THRESHOLD * 100" | bc)
+
           echo "📊 Budget Configuration:"
           echo "  Monthly Budget: \$$BUDGET USD"
-          echo "  Warning Threshold: ${WARNING_THRESHOLD} ($(echo "$BUDGET * $WARNING_THRESHOLD" | bc)% = \$$(echo "$BUDGET * $WARNING_THRESHOLD" | bc) USD)"
-          echo "  Emergency Threshold: ${EMERGENCY_THRESHOLD} ($(echo "$EMERGENCY_THRESHOLD * 100" | bc)% = \$$(echo "$BUDGET * $EMERGENCY_THRESHOLD" | bc) USD)"
+          echo "  Warning Threshold: $WARNING_PERCENT% = \$$WARNING_AMOUNT USD"
+          echo "  Emergency Threshold: $EMERGENCY_PERCENT% = \$$EMERGENCY_AMOUNT USD"
 
       - name: Check Anthropic API Usage
         id: anthropic_cost
@@ -155,6 +166,8 @@ jobs:
           # しきい値判定
           WARNING_AMOUNT=$(echo "$BUDGET * $WARNING" | bc)
           EMERGENCY_AMOUNT=$(echo "$BUDGET * $EMERGENCY" | bc)
+          WARNING_PERCENT=$(echo "$WARNING * 100" | bc)
+          EMERGENCY_PERCENT=$(echo "$EMERGENCY * 100" | bc)
 
           echo "total_cost=$TOTAL_COST" >> $GITHUB_OUTPUT
           echo "consumption_rate=$CONSUMPTION_RATE" >> $GITHUB_OUTPUT
@@ -166,8 +179,8 @@ jobs:
           echo "═══════════════════════════════════════"
           echo "💰 Total Cost: \$$TOTAL_COST USD / \$$BUDGET USD"
           echo "📈 Consumption Rate: ${CONSUMPTION_PERCENT}%"
-          echo "⚠️ Warning Level: \$$WARNING_AMOUNT USD (${WARNING})"
-          echo "🔴 Emergency Level: \$$EMERGENCY_AMOUNT USD (${EMERGENCY})"
+          echo "⚠️ Warning Level: \$$WARNING_AMOUNT USD ($WARNING_PERCENT%)"
+          echo "🔴 Emergency Level: \$$EMERGENCY_AMOUNT USD ($EMERGENCY_PERCENT%)"
           echo "═══════════════════════════════════════"
           echo ""
 
