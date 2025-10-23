@@ -1,0 +1,47 @@
+# Economic Governance Protocol - Budget Configuration
+# AGENTS.md v5.0準拠
+
+# 月次予算 (USD)
+monthly_budget_usd: 50
+
+# しきい値設定
+thresholds:
+  warning: 0.80      # 80% - 警告レベル
+  emergency: 1.50    # 150% - 緊急停止レベル
+
+# サービス別予算配分 (参考値)
+service_budgets:
+  anthropic_api: 40  # Claude API
+  firebase: 10       # Firebase Hosting, Functions, Firestore
+
+# 緊急時アクション
+emergency_actions:
+  # 緊急停止対象ワークフロー
+  disable_workflows:
+    - autonomous-agent.yml
+    - weekly-kpi-report.yml
+    - weekly-report.yml
+    - webhook-handler.yml
+    - state-machine.yml
+
+# アラート設定
+alerts:
+  # Guardianへの通知
+  guardian_notify_on:
+    - WARNING    # 警告レベルで通知
+    - EMERGENCY  # 緊急レベルで通知
+
+# 履歴保存設定
+metrics:
+  history_retention_days: 90
+  save_interval_hours: 1
+
+# コメント
+comments: |
+  このファイルは Economic Circuit Breaker workflow (.github/workflows/economic-circuit-breaker.yml)
+  によって使用されます。
+
+  月次予算を超過すると、自動的に指定されたワークフローが停止され、
+  Guardian (@repository_owner) に通知が送られます。
+
+  予算調整が必要な場合は、このファイルを編集してください。
