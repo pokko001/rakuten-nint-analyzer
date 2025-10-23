@@ -2,7 +2,7 @@
 # AGENTS.md v5.0準拠
 
 # 月次予算 (USD)
-monthly_budget_usd: 500
+monthly_budget_usd: 50
 
 # しきい値設定
 thresholds:
@@ -11,8 +11,8 @@ thresholds:
 
 # サービス別予算配分 (参考値)
 service_budgets:
-  anthropic_api: 400  # Claude API
-  firebase: 100       # Firebase Hosting, Functions, Firestore
+  anthropic_api: 40  # Claude API
+  firebase: 10       # Firebase Hosting, Functions, Firestore
 
 # 緊急時アクション
 emergency_actions:
