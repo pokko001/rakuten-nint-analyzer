@@ -1,0 +1,29 @@
+# Economic Circuit Breaker - Budget Configuration
+# コスト管理システムの予算設定
+
+# 月次予算（USD）
+monthly_budget_usd: 50
+
+# しきい値設定
+thresholds:
+  warning: 0.8      # 80% - 警告レベル（$80で警告Issue作成）
+  emergency: 1.5    # 150% - 緊急レベル（$150で自動停止）
+
+# 緊急時の自動対応
+emergency_actions:
+  # 予算超過時に自動停止するワークフロー
+  disable_workflows:
+    - claude.yml
+    - autonomous-agent-execution.yml
+    - continuous-improvement.yml
+    - agent-onboarding.yml
+
+# コスト内訳の想定
+# - Anthropic API (Claude): $80/月
+# - Firebase/GCP: $10/月
+# - GitHub Actions: 無料枠内
+#
+# 監視対象:
+# - Anthropic API使用量
+# - Firebase/GCP費用
+# - GitHub Actions実行時間（プライベートリポジトリのみ）
